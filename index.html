@@ -1,0 +1,628 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Playground</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--card:#17213a;--line:#354363;--accent:#8064ff;--text:#f4f6ff;--muted:#aebbd8}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(145deg,#1d2850,var(--bg) 60%);color:var(--text);font:16px system-ui}
+header,main{max-width:1050px;margin:auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ffffff20;gap:12px}
+h1{margin:0}h2{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:15px}
+.card{background:var(--card);border:1px solid #ffffff18;border-radius:16px;padding:18px;margin:14px 0}
+.wide{grid-column:1/-1}
+input{width:100%;padding:11px;margin:5px 0 12px;border:1px solid var(--line);border-radius:9px;background:#0b1328;color:var(--text);font:inherit}
+button{padding:10px 13px;margin:3px;border:0;border-radius:9px;background:var(--accent);color:white;font-weight:700;cursor:pointer}
+button.secondary{background:#344363}button.danger{background:#a72f4d}
+button:disabled{opacity:.45;cursor:not-allowed}
+.muted{color:var(--muted)}.hidden{display:none!important}
+.notice{background:#293657;padding:12px;border-radius:10px;overflow-wrap:anywhere}
+.chat{height:210px;overflow:auto;background:#0b1328;padding:10px;border-radius:10px}
+.msg{padding:7px;border-bottom:1px solid #ffffff16;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(5,42px);gap:5px;justify-content:center;margin:15px}
+.tile{height:42px;border:2px solid #536080;display:grid;place-items:center;font-weight:900}
+.correct{background:#21865c}.present{background:#ad8420}.absent{background:#35405a}
+.status{min-height:24px;color:var(--muted)}
+label{display:block;color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.players>div{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #ffffff15}
+input[type=checkbox]{width:auto}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>🎮 Pixel Playground</h1><span class="muted">Play • Chat • Challenge</span></div>
+  <div id="who" class="muted">Not signed in</div>
+</header>
+<main>
+
+<section id="connect" class="card">
+<h2>Connect Pixel Playground</h2>
+<p class="muted">Enter your Supabase Project URL and public publishable/anon key.</p>
+<label>Project URL</label><input id="url" placeholder="https://your-project.supabase.co">
+<label>Public key</label><input id="key" placeholder="Your public key">
+<button id="connectBtn">Connect</button>
+<div id="connectStatus" class="status"></div>
+</section>
+
+<section id="auth" class="card hidden">
+<div class="grid">
+<div>
+<h2>Create account</h2>
+<label>Username</label><input id="newName" maxlength="20" placeholder="Choose a username">
+<label>Email</label><input id="newEmail" type="email">
+<label>Password (8+ characters)</label><input id="newPass" type="password">
+<button id="signup">Sign up</button>
+</div>
+<div>
+<h2>Sign in</h2>
+<label>Email</label><input id="email" type="email">
+<label>Password</label><input id="pass" type="password">
+<button id="login">Sign in</button>
+</div>
+</div>
+<div id="authStatus" class="status"></div>
+</section>
+
+<div id="app" class="hidden">
+<section class="card">
+<div class="row">
+<span id="role">Player</span>
+<span id="streak" class="muted">🔥 0 day streak</span>
+<button id="logout" class="secondary">Sign out</button>
+</div>
+<h2 id="welcome"></h2>
+<div id="announcement" class="notice">Welcome!</div>
+<div id="maintenance" class="notice hidden">Maintenance mode is on. Games and chat are paused.</div>
+</section>
+
+<div class="grid">
+<section class="card">
+<h2>🌍 Global chat</h2>
+<div id="chat" class="chat"></div>
+<input id="message" maxlength="500" placeholder="Write a message">
+<button id="send">Send</button>
+<div id="chatStatus" class="status"></div>
+</section>
+
+<section class="card">
+<h2>🕹️ Games</h2>
+<button id="wordleBtn">Daily Wordle</button>
+<button id="numberBtn">Number Hunt</button>
+<button id="mathBtn">Quick Maths</button>
+<button id="tttBtn">Tic-Tac-Toe</button>
+<div id="game" class="notice">Choose a game to play.</div>
+<div id="gameStatus" class="status"></div>
+</section>
+
+<section id="admin" class="card wide hidden">
+<h2>🛡️ Global admin dashboard</h2>
+<p class="muted">Changes here affect all website copies connected to this Supabase project.</p>
+
+<h3>Announcement</h3>
+<input id="announceInput" maxlength="300" placeholder="Message for everyone">
+<button id="saveAnnouncement">Save announcement</button>
+
+<h3>Maintenance</h3>
+<label><input id="maintToggle" type="checkbox"> Turn maintenance mode on</label>
+<button id="saveMaintenance">Save maintenance setting</button>
+
+<h3>Enable or disable games</h3>
+<div class="row">
+<label><input id="gWordle" type="checkbox"> Wordle</label>
+<label><input id="gNumber" type="checkbox"> Number Hunt</label>
+<label><input id="gMath" type="checkbox"> Quick Maths</label>
+<label><input id="gTtt" type="checkbox"> Tic-Tac-Toe</label>
+</div>
+<button id="saveGames">Save game settings</button>
+
+<h3>Today's Wordle answer</h3>
+<input id="newWord" maxlength="5" placeholder="APPLE">
+<button id="setWord">Set today's word</button>
+
+<h3>Player moderation</h3>
+<button id="loadPlayers" class="secondary">Refresh player list</button>
+<div id="players" class="players"></div>
+
+<h3>Clear global chat</h3>
+<button id="clearChat" class="danger">Clear chat for everyone</button>
+<div id="adminStatus" class="status"></div>
+</section>
+</div>
+</div>
+</main>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+let db, user, profile, settings = {}, channel;
+let wd, numberAnswer, mathAnswer, ttt = Array(9).fill(''), turn = 'X', over = false;
+
+const status = (id, message) => $(id).textContent = message || '';
+const show = (id, visible) => $(id).classList.toggle('hidden', !visible);
+const games = () => settings.games || {
+  wordle:true, numberHunt:true, quickMaths:true, ticTacToe:true
+};
+const paused = () => settings.maintenance === true;
+
+async function connect() {
+  try {
+    const url = $('url').value.trim();
+    const key = $('key').value.trim();
+    if (!url.startsWith('https://') || !key) {
+      status('connectStatus', 'Enter a valid project URL and public key.');
+      return;
+    }
+    db = window.supabase.createClient(url, key);
+    localStorage.setItem('ppurl', url);
+    localStorage.setItem('ppkey', key);
+    status('connectStatus', 'Connected to Supabase.');
+    show('connect', false);
+    show('auth', true);
+
+    const {data, error} = await db.auth.getSession();
+    if (error) throw error;
+    await session(data.session);
+
+    db.auth.onAuthStateChange((event, sessionData) => {
+      setTimeout(() => session(sessionData), 0);
+    });
+  } catch (e) {
+    status('connectStatus', e.message);
+  }
+}
+
+async function session(s) {
+  user = s?.user || null;
+  if (!user) {
+    profile = null;
+    show('app', false);
+    show('auth', true);
+    $('who').textContent = 'Not signed in';
+    return;
+  }
+
+  const {data:p, error} = await db.from('pp_profiles')
+    .select('*').eq('id', user.id).single();
+
+  if (error || !p) {
+    status('authStatus', 'Could not load profile. Check that the SQL setup succeeded.');
+    return;
+  }
+  profile = p;
+
+  if (p.banned) {
+    await db.auth.signOut();
+    status('authStatus', 'This account has been disabled.');
+    return;
+  }
+
+  show('auth', false);
+  show('app', true);
+  $('who').textContent = p.username;
+  $('welcome').textContent = 'Welcome, ' + p.username + '!';
+  $('role').textContent = p.role === 'admin' ? '🛡️ Administrator' : '🎮 Player';
+  show('admin', p.role === 'admin');
+
+  const {data:st, error:stError} = await db.rpc('pp_touch_streak');
+  if (!stError && st) $('streak').textContent = '🔥 ' + st.streak + ' day streak';
+
+  await loadSettings();
+  await loadChat();
+  await loadWordle();
+  subscribe();
+  if (p.role === 'admin') await loadPlayers();
+}
+
+async function signup() {
+  const name = $('newName').value.trim();
+  const email = $('newEmail').value.trim();
+  const password = $('newPass').value;
+
+  if (!/^[A-Za-z0-9_ -]{3,20}$/.test(name)) {
+    status('authStatus', 'Username must be 3–20 letters, numbers, spaces, _ or -.');
+    return;
+  }
+  if (password.length < 8) {
+    status('authStatus', 'Password must be at least 8 characters.');
+    return;
+  }
+
+  const {error} = await db.auth.signUp({
+    email, password, options: {data: {username: name}}
+  });
+  status('authStatus', error ? error.message :
+    'Account created. Verify your email if asked, then sign in.');
+}
+
+async function login() {
+  const {error} = await db.auth.signInWithPassword({
+    email: $('email').value.trim(),
+    password: $('pass').value
+  });
+  status('authStatus', error ? error.message : 'Signed in.');
+}
+
+async function loadSettings() {
+  const {data, error} = await db.from('pp_settings').select('key,value');
+  if (error) {
+    status('authStatus', error.message);
+    return;
+  }
+
+  settings = {};
+  data.forEach(item => settings[item.key] = item.value);
+  $('announcement').textContent = settings.announcement || 'Welcome!';
+  show('maintenance', paused());
+
+  if (profile?.role === 'admin') {
+    $('announceInput').value = settings.announcement || '';
+    $('maintToggle').checked = paused();
+    const g = games();
+    $('gWordle').checked = g.wordle !== false;
+    $('gNumber').checked = g.numberHunt !== false;
+    $('gMath').checked = g.quickMaths !== false;
+    $('gTtt').checked = g.ticTacToe !== false;
+  }
+
+  [
+    ['wordleBtn','wordle'],
+    ['numberBtn','numberHunt'],
+    ['mathBtn','quickMaths'],
+    ['tttBtn','ticTacToe']
+  ].forEach(([id, key]) => {
+    $(id).disabled = paused() || games()[key] === false;
+  });
+
+  $('send').disabled = paused();
+  $('message').disabled = paused();
+}
+
+function subscribe() {
+  if (channel) db.removeChannel(channel);
+
+  channel = db.channel('pixel-playground-live')
+    .on('postgres_changes', {
+      event:'*', schema:'public', table:'pp_settings'
+    }, () => loadSettings())
+    .on('postgres_changes', {
+      event:'INSERT', schema:'public', table:'pp_messages'
+    }, event => addMessage(event.new))
+    .subscribe();
+}
+
+function addMessage(m) {
+  if ($('chat').querySelector('[data-id="' + m.id + '"]')) return;
+
+  const box = document.createElement('div');
+  box.className = 'msg';
+  box.dataset.id = m.id;
+
+  const title = document.createElement('b');
+  title.textContent = m.username + ' ';
+
+  const time = document.createElement('small');
+  time.textContent = new Date(m.created_at).toLocaleTimeString([], {
+    hour:'2-digit', minute:'2-digit'
+  });
+
+  const body = document.createElement('div');
+  body.textContent = m.message;
+
+  box.append(title, time, body);
+  $('chat').append(box);
+  $('chat').scrollTop = $('chat').scrollHeight;
+}
+
+async function loadChat() {
+  const {data, error} = await db.from('pp_messages')
+    .select('*').order('created_at', {ascending:false}).limit(100);
+
+  if (error) {
+    status('chatStatus', error.message);
+    return;
+  }
+  $('chat').innerHTML = '';
+  data.reverse().forEach(addMessage);
+}
+
+async function sendMessage() {
+  if (paused()) {
+    status('chatStatus', 'Chat is paused during maintenance.');
+    return;
+  }
+
+  const message = $('message').value.trim();
+  if (!message) return;
+
+  const {error} = await db.from('pp_messages').insert({
+    user_id:user.id, username:profile.username, message
+  });
+
+  if (error) status('chatStatus', error.message);
+  else {
+    $('message').value = '';
+    status('chatStatus', 'Message sent.');
+  }
+}
+
+async function rpc(name, args) {
+  const {error} = await db.rpc(name, args);
+  if (error) throw error;
+}
+
+async function saveSetting(key, value) {
+  // Send the value itself as JSON, not JSON.stringify(value).
+  await rpc('pp_admin_update_setting', {
+    setting_key:key, setting_value:value
+  });
+  await loadSettings();
+}
+
+$('saveAnnouncement').onclick = async () => {
+  try {
+    await saveSetting('announcement', $('announceInput').value.trim());
+    status('adminStatus', 'Announcement synced for everyone.');
+  } catch (e) {
+    status('adminStatus', e.message);
+  }
+};
+
+$('saveMaintenance').onclick = async () => {
+  try {
+    await saveSetting('maintenance', $('maintToggle').checked);
+    status('adminStatus', 'Maintenance setting saved.');
+  } catch (e) {
+    status('adminStatus', e.message);
+  }
+};
+
+$('saveGames').onclick = async () => {
+  try {
+    await saveSetting('games', {
+      wordle:$('gWordle').checked,
+      numberHunt:$('gNumber').checked,
+      quickMaths:$('gMath').checked,
+      ticTacToe:$('gTtt').checked
+    });
+    status('adminStatus', 'Game settings synced for everyone.');
+  } catch (e) {
+    status('adminStatus', e.message);
+  }
+};
+
+async function loadPlayers() {
+  const {data, error} = await db.from('pp_profiles')
+    .select('id,username,role,banned,streak')
+    .order('created_at', {ascending:false}).limit(200);
+
+  if (error) {
+    status('adminStatus', error.message);
+    return;
+  }
+
+  $('players').innerHTML = '';
+  data.forEach(p => {
+    const row = document.createElement('div');
+    const name = document.createElement('span');
+    name.textContent = p.username + ' • ' + p.role +
+      (p.banned ? ' • BANNED' : '') + ' • 🔥' + p.streak;
+    row.append(name);
+
+    if (p.id !== user.id) {
+      const button = document.createElement('button');
+      button.className = p.banned ? '' : 'danger';
+      button.textContent = p.banned ? 'Unban' : 'Ban';
+
+      button.onclick = async () => {
+        try {
+          await rpc('pp_admin_set_banned', {
+            target_user:p.id, should_ban:!p.banned
+          });
+          await loadPlayers();
+          status('adminStatus', 'Player moderation updated.');
+        } catch (e) {
+          status('adminStatus', e.message);
+        }
+      };
+      row.append(button);
+    }
+    $('players').append(row);
+  });
+}
+
+$('loadPlayers').onclick = loadPlayers;
+
+$('clearChat').onclick = async () => {
+  if (!confirm('Clear chat for everyone?')) return;
+  try {
+    await rpc('pp_admin_clear_chat', {});
+    await loadChat();
+    status('adminStatus', 'Global chat cleared.');
+  } catch (e) {
+    status('adminStatus', e.message);
+  }
+};
+
+$('setWord').onclick = async () => {
+  try {
+    await rpc('pp_admin_set_daily_wordle', {
+      new_answer:$('newWord').value.trim().toUpperCase()
+    });
+    await loadWordle();
+    status('adminStatus', 'Today's Wordle answer has been changed.');
+  } catch (e) {
+    status('adminStatus', e.message);
+  }
+};
+
+async function loadWordle() {
+  const {data, error} = await db.rpc('pp_get_daily_wordle');
+  if (error) {
+    status('gameStatus', error.message);
+    return;
+  }
+  wd = data;
+  renderWordle();
+}
+
+function renderWordle() {
+  const area = $('game');
+  area.innerHTML = '<h3>Daily Wordle</h3><p>Six guesses • one puzzle per UK day • progress saved to your account</p>';
+
+  const grid = document.createElement('div');
+  grid.className = 'tiles';
+
+  for (let r=0; r<6; r++) {
+    for (let c=0; c<5; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.textContent = wd.guesses?.[r]?.[c] || '';
+      const feedback = wd.feedback?.[r]?.[c];
+      if (feedback) tile.classList.add(feedback);
+      grid.append(tile);
+    }
+  }
+  area.append(grid);
+
+  const input = document.createElement('input');
+  input.maxLength = 5;
+  input.placeholder = 'Five letters';
+  input.style.maxWidth = '220px';
+
+  const button = document.createElement('button');
+  button.textContent = 'Guess';
+  button.disabled = wd.status !== 'playing' || paused() || games().wordle === false;
+
+  button.onclick = async () => {
+    try {
+      const {data, error} = await db.rpc('pp_submit_daily_wordle_guess', {
+        p_guess:input.value.trim().toUpperCase()
+      });
+      if (error) throw error;
+      wd = data;
+      renderWordle();
+      status('gameStatus',
+        data.status === 'won' ? 'Solved! 🎉' :
+        data.status === 'lost' ? 'Finished. Answer: ' + data.answer :
+        'Guess saved.');
+    } catch (e) {
+      status('gameStatus', e.message);
+    }
+  };
+
+  input.onkeydown = e => { if (e.key === 'Enter') button.click(); };
+  area.append(input, button);
+
+  if (wd.status === 'won' || wd.status === 'lost') {
+    const answer = document.createElement('p');
+    answer.textContent = 'Answer: ' + wd.answer;
+    area.append(answer);
+  }
+}
+
+function showGame(title, html) {
+  $('game').innerHTML = '<h3>' + title + '</h3>' + html;
+}
+
+function numberGame() {
+  if (paused() || !games().numberHunt) return;
+  numberAnswer = 1 + Math.floor(Math.random()*100);
+  showGame('Number Hunt',
+    '<p>Guess a number from 1 to 100.</p><input id="ng" type="number"><button id="nb">Guess</button><p id="nh"></p>');
+
+  $('nb').onclick = () => {
+    const n = Number($('ng').value);
+    $('nh').textContent = n === numberAnswer ? 'Correct! 🎉' :
+      n < numberAnswer ? 'Too low!' : 'Too high!';
+  };
+}
+
+function mathGame() {
+  if (paused() || !games().quickMaths) return;
+  const a = 1 + Math.floor(Math.random()*20);
+  const b = 1 + Math.floor(Math.random()*20);
+  const op = Math.random() < .5 ? '+' : '−';
+  mathAnswer = op === '+' ? a+b : a-b;
+
+  showGame('Quick Maths',
+    '<p>' + a + ' ' + op + ' ' + b + ' = ?</p><input id="mg" type="number"><button id="mb">Check</button><p id="mh"></p>');
+
+  $('mb').onclick = () => {
+    $('mh').textContent = Number($('mg').value) === mathAnswer ?
+      'Correct!' : 'Try again.';
+  };
+}
+
+function tttGame() {
+  if (paused() || !games().ticTacToe) return;
+  ttt = Array(9).fill('');
+  turn = 'X';
+  over = false;
+  renderTtt();
+}
+
+function renderTtt() {
+  showGame('Tic-Tac-Toe',
+    '<p>Local two-player game on this device.</p><div id="tg" class="row"></div><p id="th"></p><button id="tr">New game</button>');
+
+  const grid = $('tg');
+  grid.style.maxWidth = '230px';
+  const wins = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  for (let i=0; i<9; i++) {
+    const button = document.createElement('button');
+    button.style.width = '65px';
+    button.style.height = '55px';
+    button.textContent = ttt[i];
+    button.disabled = !!ttt[i] || over;
+
+    button.onclick = () => {
+      ttt[i] = turn;
+      const winner = wins.find(line => line.every(j => ttt[j] === turn));
+      if (winner) over = true;
+      else if (ttt.every(Boolean)) over = true;
+      else turn = turn === 'X' ? 'O' : 'X';
+      renderTtt();
+    };
+    grid.append(button);
+  }
+
+  const winner = wins.map(line =>
+    ttt[line[0]] && line.every(j => ttt[j] === ttt[line[0]]) ?
+    ttt[line[0]] : null
+  ).find(Boolean);
+
+  $('th').textContent = winner ? 'Winner: ' + winner :
+    over ? 'Draw!' : 'Turn: ' + turn;
+  $('tr').onclick = tttGame;
+}
+
+$('wordleBtn').onclick = loadWordle;
+$('numberBtn').onclick = numberGame;
+$('mathBtn').onclick = mathGame;
+$('tttBtn').onclick = tttGame;
+$('connectBtn').onclick = connect;
+$('signup').onclick = signup;
+$('login').onclick = login;
+$('logout').onclick = () => db.auth.signOut();
+$('send').onclick = sendMessage;
+$('message').onkeydown = e => { if (e.key === 'Enter') sendMessage(); };
+
+try {
+  if (localStorage.getItem('ppurl')) $('url').value = localStorage.getItem('ppurl');
+  if (localStorage.getItem('ppkey')) $('key').value = localStorage.getItem('ppkey');
+} catch (e) {}
+})();
+</script>
+</body>
+</html>
